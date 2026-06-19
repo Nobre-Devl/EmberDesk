@@ -22,8 +22,17 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["user", "agent", "admin"],
-      default: "user",
+      enum: ["super_admin", "admin", "agent"],
+      default: "agent",
+    },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: true,
+    },
+    active: {
+      type: Boolean,
+      default: true,
     },
   },
   {
