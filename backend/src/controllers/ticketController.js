@@ -1,19 +1,29 @@
 import Ticket from "../models/Ticket.js";
 
+const buildCustomerFilter = (user) => {
+  if (user.role === "super_admin" || user.role === "admin") return {};
+  if (user.customers.length > 0) return { customer: { $in: user.customers } };
+  return { customer: null };
+};
+
 export const createTicket = async (req, res) => {
   try {
-    const { title, description, priority, category } = req.body;
+    const { title, description, priority, category, customer, asset } =
+      req.body;
 
     const ticket = await Ticket.create({
       title,
       description,
       priority,
       category,
+      customer,
+      asset: asset || null,
       company: req.user.company._id,
       createdBy: req.user._id,
     });
 
     await ticket.populate("createdBy", "name email role");
+    await ticket.populate("customer", "name email");
 
     res.status(201).json(ticket);
   } catch (error) {
@@ -23,13 +33,16 @@ export const createTicket = async (req, res) => {
 
 export const listTickets = async (req, res) => {
   try {
-    const { status, priority, assignedTo, page = 1, limit = 20 } = req.query;
+    const { status, priority, customer, page = 1, limit = 20 } = req.query;
 
-    const filter = { company: req.user.company._id };
+    const filter = {
+      company: req.user.company._id,
+      ...buildCustomerFilter(req.user),
+    };
 
     if (status) filter.status = status;
     if (priority) filter.priority = priority;
-    if (assignedTo) filter.assignedTo = assignedTo;
+    if (customer) filter.customer = customer;
 
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -37,6 +50,7 @@ export const listTickets = async (req, res) => {
       Ticket.find(filter)
         .populate("createdBy", "name email")
         .populate("assignedTo", "name email")
+        .populate("customer", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
@@ -56,12 +70,17 @@ export const listTickets = async (req, res) => {
 
 export const getTicket = async (req, res) => {
   try {
+    const customerFilter = buildCustomerFilter(req.user);
+
     const ticket = await Ticket.findOne({
       _id: req.params.id,
       company: req.user.company._id,
+      ...customerFilter,
     })
       .populate("createdBy", "name email role")
       .populate("assignedTo", "name email role")
+      .populate("customer", "name email")
+      .populate("asset", "name type serialNumber")
       .populate("comments.author", "name email role");
 
     if (!ticket) {
@@ -78,10 +97,12 @@ export const updateTicket = async (req, res) => {
   try {
     const { status, priority, category, assignedTo, title, description } =
       req.body;
+    const customerFilter = buildCustomerFilter(req.user);
 
     const ticket = await Ticket.findOne({
       _id: req.params.id,
       company: req.user.company._id,
+      ...customerFilter,
     });
 
     if (!ticket) {
@@ -96,11 +117,36 @@ export const updateTicket = async (req, res) => {
     if (assignedTo !== undefined) ticket.assignedTo = assignedTo;
 
     await ticket.save();
-
     await ticket.populate("createdBy", "name email role");
     await ticket.populate("assignedTo", "name email role");
+    await ticket.populate("customer", "name email");
 
     res.json(ticket);
+  } catch (error) {
+    res.status(500).json({ message: "Erro interno do servidor" });
+  }
+};
+
+export const rateTicket = async (req, res) => {
+  try {
+    const { score, comment } = req.body;
+
+    const ticket = await Ticket.findOne({
+      _id: req.params.id,
+      company: req.user.company._id,
+      status: "resolved",
+    });
+
+    if (!ticket) {
+      return res
+        .status(404)
+        .json({ message: "Chamado não encontrado ou não finalizado" });
+    }
+
+    ticket.rating = { score, comment: comment || null };
+    await ticket.save();
+
+    res.json({ message: "Avaliação registrada", rating: ticket.rating });
   } catch (error) {
     res.status(500).json({ message: "Erro interno do servidor" });
   }
@@ -109,10 +155,12 @@ export const updateTicket = async (req, res) => {
 export const addComment = async (req, res) => {
   try {
     const { body } = req.body;
+    const customerFilter = buildCustomerFilter(req.user);
 
     const ticket = await Ticket.findOne({
       _id: req.params.id,
       company: req.user.company._id,
+      ...customerFilter,
     });
 
     if (!ticket) {
@@ -121,11 +169,9 @@ export const addComment = async (req, res) => {
 
     ticket.comments.push({ author: req.user._id, body });
     await ticket.save();
-
     await ticket.populate("comments.author", "name email role");
 
     const newComment = ticket.comments[ticket.comments.length - 1];
-
     res.status(201).json(newComment);
   } catch (error) {
     res.status(500).json({ message: "Erro interno do servidor" });
@@ -144,7 +190,6 @@ export const deleteTicket = async (req, res) => {
     }
 
     await ticket.deleteOne();
-
     res.json({ message: "Chamado removido com sucesso" });
   } catch (error) {
     res.status(500).json({ message: "Erro interno do servidor" });

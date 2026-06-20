@@ -4,6 +4,7 @@ import {
   listTickets,
   getTicket,
   updateTicket,
+  rateTicket,
   addComment,
   deleteTicket,
 } from "../controllers/ticketController.js";
@@ -17,6 +18,7 @@ router.get("/", listTickets);
 router.post("/", createTicket);
 router.get("/:id", getTicket);
 router.patch("/:id", updateTicket);
+router.post("/:id/rate", rateTicket);
 router.post("/:id/comments", addComment);
 router.delete("/:id", restrictTo("super_admin", "admin"), deleteTicket);
 

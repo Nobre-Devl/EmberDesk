@@ -30,6 +30,12 @@ const userSchema = new mongoose.Schema(
       ref: "Company",
       required: true,
     },
+    customers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Customer",
+      },
+    ],
     active: {
       type: Boolean,
       default: true,

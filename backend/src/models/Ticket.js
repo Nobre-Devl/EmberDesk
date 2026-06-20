@@ -25,6 +25,16 @@ const ticketSchema = new mongoose.Schema(
       ref: "Company",
       required: true,
     },
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      required: true,
+    },
+    asset: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Asset",
+      default: null,
+    },
     title: {
       type: String,
       required: true,
@@ -49,6 +59,19 @@ const ticketSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: null,
+    },
+    rating: {
+      score: {
+        type: Number,
+        min: 1,
+        max: 5,
+        default: null,
+      },
+      comment: {
+        type: String,
+        trim: true,
+        default: null,
+      },
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
